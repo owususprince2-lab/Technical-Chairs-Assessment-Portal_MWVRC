@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>MWVRC 2026 · Oral Presentation Assessment</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ================= LOGIN (chair select + PIN) ================= -->
+  <div id="screen-login" class="screen">
+    <div class="login-wrap">
+      <div class="login-hero">
+        <div class="mark-lg"></div>
+        <h1>MWVRC 2026 · Oral Assessment Portal</h1>
+        <p>Technical Breakout Sessions — sign in to score the presenters in your room.</p>
+      </div>
+
+      <div class="login-body">
+
+        <!-- Step 1: pick yourself -->
+        <div id="step-pick">
+          <p class="section-label">Select your name</p>
+          <div id="chair-grid" class="chair-grid"></div>
+        </div>
+
+        <!-- Step 2: create or enter PIN -->
+        <div id="step-pin" class="hidden">
+          <button class="back-link" id="btn-back-to-pick">← Not you? Choose again</button>
+          <div class="pin-card">
+            <div class="selected-chair">
+              <div id="picked-avatar"></div>
+              <div class="meta">
+                <strong id="picked-name"></strong>
+                <span id="picked-room"></span>
+              </div>
+            </div>
+
+            <!-- create pin (first time) -->
+            <div id="create-pin-form" class="hidden">
+              <p class="pin-title">Create your 4-digit PIN</p>
+              <p class="pin-sub">No PIN is set for you yet. Choose one now — you'll use it every time you log in.</p>
+              <div class="pin-dots-input" data-group="new">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+              </div>
+              <p class="pin-sub" style="margin-bottom:8px;text-align:center;">Confirm PIN</p>
+              <div class="pin-dots-input" data-group="confirm">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+              </div>
+              <p class="field-error" id="create-pin-error"></p>
+              <button class="btn btn-primary" id="btn-create-pin">Create PIN &amp; continue</button>
+            </div>
+
+            <!-- enter pin (returning) -->
+            <div id="enter-pin-form" class="hidden">
+              <p class="pin-title">Enter your PIN</p>
+              <p class="pin-sub">Welcome back — enter your 4-digit PIN to continue.</p>
+              <div class="pin-dots-input" data-group="enter">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
+              </div>
+              <p class="field-error" id="enter-pin-error"></p>
+              <button class="btn btn-primary" id="btn-login">Log in</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN APP (after login) ================= -->
+  <div id="screen-app" class="hidden">
+    <div class="topbar">
+      <div class="brand"><span class="mark"></span> MWVRC 2026</div>
+      <div class="who">Signed in as <strong id="nav-who"></strong> &nbsp;·&nbsp; <button class="back-link" id="btn-logout" style="color:#C9C2B2;">Log out</button></div>
+    </div>
+    <div class="tabbar">
+      <button id="tab-room" class="active">My Room</button>
+      <button id="tab-results">Results</button>
+    </div>
+
+    <main>
+      <!-- Room / presenter list -->
+      <div id="view-room" class="screen"></div>
+
+      <!-- Assessment form -->
+      <div id="view-assess" class="screen hidden"></div>
+
+      <!-- Results -->
+      <div id="view-results" class="screen hidden"></div>
+    </main>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
