@@ -1,125 +1,141 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MWVRC 2026 — Assessment Portal</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MWVRC 2026 — Oral Assessment Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-<div class="portal">
-  <div class="header">
-    <div class="header-logo">MWVRC 2026 · KNUST</div>
-    <div class="header-title">Assessment Portal</div>
-    <div class="header-sub">Mineral Waste Valorization Research Conference</div>
+<!-- ═══════════════════════════════════
+     SCREEN 1 — WELCOME / AUTH
+═══════════════════════════════════ -->
+<div id="screen-auth" class="screen active">
+  <div class="auth-hero">
+    <div class="hero-badge">MWVRC 2026</div>
+    <h1 class="hero-title">Oral Assessment<br/><em>Portal</em></h1>
+    <p class="hero-sub">Mineral Waste Valorization Research Conference<br/>KNUST · Kumasi, Ghana · 25 June 2026</p>
   </div>
 
-  <div class="tab-bar">
-    <button class="tab active" onclick="switchTab('oral')">Oral</button>
-    <button class="tab" onclick="switchTab('poster')">Poster</button>
-    <button class="tab" onclick="switchTab('results')">Results</button>
-  </div>
+  <div class="auth-body">
+    <!-- Chair selection grid -->
+    <p class="auth-label">Select your profile</p>
+    <div class="chair-grid" id="chair-grid"></div>
 
-  <!-- ═══ ORAL TAB ═══ -->
-  <div id="tab-oral" class="screen active">
-    <div id="oral-chair-select">
-      <p class="section-heading">Select your role</p>
-      <div id="oral-chairs-list"></div>
-    </div>
+    <!-- PIN area (shown after chair selected) -->
+    <div id="pin-area" class="pin-area hidden">
+      <div class="selected-chair-banner" id="selected-chair-banner"></div>
 
-    <div id="oral-form" style="display:none">
-      <button class="back-btn" onclick="backToOralChairs()">&#8592; Change assessor</button>
-      <div class="card">
-        <div class="card-title"><span class="icon">🎓</span> Presenter</div>
-        <div class="form-row">
-          <label>Presenter Number</label>
-          <select id="oral-presenter">
-            <option value="">— Select presenter —</option>
-          </select>
+      <!-- Setup PIN (first time) -->
+      <div id="pin-setup" class="pin-section hidden">
+        <p class="pin-instruction">Create your 4-digit PIN</p>
+        <p class="pin-hint">You will use this PIN every time you log in.</p>
+        <div class="pin-dots" id="setup-dots">
+          <span></span><span></span><span></span><span></span>
         </div>
-      </div>
-      <div id="oral-rubric-items"></div>
-      <div class="total-card">
-        <div class="total-label">Total Score</div>
-        <div><span class="total-score" id="oral-total">0</span><span class="total-max"> / 32</span></div>
-        <div class="total-rating" id="oral-rating">—</div>
-      </div>
-      <div id="oral-alert"></div>
-      <button class="btn-primary" onclick="submitOral()">Submit Assessment</button>
-      <button class="btn-secondary" onclick="clearOralForm()">Clear Form</button>
-    </div>
-  </div>
-
-  <!-- ═══ POSTER TAB ═══ -->
-  <div id="tab-poster" class="screen">
-    <div id="poster-chair-select">
-      <p class="section-heading">Select your role</p>
-      <div id="poster-chairs-list"></div>
-    </div>
-
-    <div id="poster-form" style="display:none">
-      <button class="back-btn" onclick="backToPosterChairs()">&#8592; Change assessor</button>
-      <div class="card">
-        <div class="card-title"><span class="icon">🖼️</span> Select Poster</div>
-        <p class="helper-text">Tap a poster number to assess. Green = submitted.</p>
-        <div class="poster-grid" id="poster-grid"></div>
-        <div class="progress-bar"><div class="progress-fill" id="poster-progress"></div></div>
-        <p class="helper-text" id="poster-progress-label">0 of 20 assessed</p>
+        <div class="numpad" id="setup-numpad"></div>
+        <div id="setup-error" class="pin-error hidden"></div>
       </div>
 
-      <div id="poster-rubric-section" style="display:none">
-        <div class="card card-active">
-          <div class="card-title"><span class="icon">🖼️</span> <span id="poster-current-label">Poster —</span></div>
+      <!-- Login PIN (returning) -->
+      <div id="pin-login" class="pin-section hidden">
+        <p class="pin-instruction">Enter your 4-digit PIN</p>
+        <div class="pin-dots" id="login-dots">
+          <span></span><span></span><span></span><span></span>
         </div>
-        <div id="poster-rubric-items"></div>
-        <div class="total-card">
-          <div class="total-label">Total Score</div>
-          <div><span class="total-score" id="poster-total">0</span><span class="total-max"> / 40</span></div>
-          <div class="total-rating" id="poster-rating">—</div>
-        </div>
-        <div id="poster-alert"></div>
-        <button class="btn-primary" onclick="submitPoster()">Submit Poster Assessment</button>
-        <button class="btn-secondary" onclick="clearPosterForm()">Clear Scores</button>
+        <div class="numpad" id="login-numpad"></div>
+        <div id="login-error" class="pin-error hidden"></div>
+        <button class="reset-pin-btn" onclick="resetPin()">Reset PIN</button>
       </div>
-    </div>
-  </div>
-
-  <!-- ═══ RESULTS TAB ═══ -->
-  <div id="tab-results" class="screen">
-    <div class="seg-control">
-      <button class="seg-btn active" onclick="switchResults('oral')">Oral</button>
-      <button class="seg-btn" onclick="switchResults('poster')">Poster</button>
-    </div>
-
-    <div id="results-oral">
-      <p class="section-heading">Oral — Overall Rankings</p>
-      <div class="card" id="oral-rankings-card">
-        <p class="empty-state">No submissions yet.</p>
-      </div>
-      <p class="section-heading">Scores by Assessor</p>
-      <div id="oral-by-chair"></div>
-    </div>
-
-    <div id="results-poster" style="display:none">
-      <p class="section-heading">Poster — Rankings (avg. of 6 chairs)</p>
-      <div class="card" id="poster-rankings-card">
-        <p class="empty-state">No submissions yet.</p>
-      </div>
-      <p class="section-heading">Scores by Technical Chair</p>
-      <div id="poster-by-chair"></div>
     </div>
   </div>
 </div>
 
-<!-- ═══ INFO MODAL ═══ -->
-<div id="info-modal" class="modal-overlay" style="display:none" onclick="closeModal(event)">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeInfoModal()">&#215;</button>
-    <div class="modal-title" id="modal-title"></div>
-    <div id="modal-body"></div>
+<!-- ═══════════════════════════════════
+     SCREEN 2 — DASHBOARD
+═══════════════════════════════════ -->
+<div id="screen-dashboard" class="screen">
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div>
+        <div class="app-header-badge">MWVRC 2026</div>
+        <div class="app-header-name" id="header-chair-name"></div>
+      </div>
+      <button class="logout-btn" onclick="logout()" aria-label="Log out">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tab-bar">
+    <button class="tab active" data-tab="assess" onclick="switchTab('assess')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Assess
+    </button>
+    <button class="tab" data-tab="results" onclick="switchTab('results')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Results
+    </button>
+  </nav>
+
+  <!-- ASSESS TAB -->
+  <div id="tab-assess" class="tab-content active">
+    <div class="room-header" id="room-header"></div>
+    <div id="presenter-list"></div>
+  </div>
+
+  <!-- RESULTS TAB -->
+  <div id="tab-results" class="tab-content">
+    <div class="results-header">
+      <h2 class="results-title">Live Rankings</h2>
+      <p class="results-sub">All rooms · ranked by average score</p>
+    </div>
+    <div id="results-list"></div>
+    <button class="refresh-btn" onclick="loadResults()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════
+     SCREEN 3 — SCORE SHEET
+═══════════════════════════════════ -->
+<div id="screen-score" class="screen">
+  <header class="app-header">
+    <div class="app-header-inner">
+      <button class="back-btn" onclick="backToDashboard()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <div class="app-header-badge" style="margin-left:auto">MWVRC 2026</div>
+    </div>
+  </header>
+
+  <div class="score-presenter-card" id="score-presenter-card"></div>
+
+  <div class="score-body">
+    <div id="rubric-items"></div>
+
+    <div class="score-total-card" id="score-total-card">
+      <div class="stc-label">Total Score</div>
+      <div class="stc-score"><span id="total-score">0</span><span class="stc-max">/40</span></div>
+      <div class="stc-rating" id="total-rating">—</div>
+    </div>
+
+    <div id="score-alert"></div>
+
+    <button class="btn-submit" id="btn-submit" onclick="submitScore()">Submit Assessment</button>
+    <button class="btn-clear" onclick="clearScores()">Clear All Ratings</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast hidden"></div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>
