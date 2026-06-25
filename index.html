@@ -300,12 +300,12 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyKZwHrvjiZk2nKxMbd8fYA
 // Photos should sit in an "images/" folder next to this index.html,
 // using EXACTLY these filenames.
 const CHAIRS = [
-  { name: "Dr. Efiba Vidda Senkyire Kwarteng", room: "A", photo: "images/Dr. Efiba Vidda.jpeg" },
-  { name: "Dr. Emmanuel Kwesi Arthur",          room: "A", photo: "images/Dr. Emmanuel Arthur.jpeg" },
-  { name: "Dr. Miriam Appiah-Brempong",         room: "B", photo: "images/Dr. Miriam Brempong.jpeg" },
-  { name: "Dr. Henry Agbe",                     room: "B", photo: "images/Dr. Henry Agbe.jpeg" },
-  { name: "Dr. Mizpah Ama Dziedzorm Rockson",   room: "C", photo: "images/Dr. Mrs. Mizpah Ama Dziedzorm.jpeg" },
-  { name: "Dr. Emmanuela Kwao-Boateng",         room: "C", photo: "images/Dr. Emmanuela Kwao Boateng.jpeg" }
+  { name: "Dr. Efiba Vidda Senkyire Kwarteng", room: "A", photo: "Dr. Efiba Vidda.jpeg" },
+  { name: "Dr. Emmanuel Kwesi Arthur",          room: "A", photo: "Dr. Emmanuel Arthur.jpeg" },
+  { name: "Dr. Miriam Appiah-Brempong",         room: "B", photo: "Dr. Miriam Brempong.jpeg" },
+  { name: "Dr. Henry Agbe",                     room: "B", photo: "Dr. Henry Agbe.jpeg" },
+  { name: "Dr. Mizpah Ama Dziedzorm Rockson",   room: "C", photo: "Dr. Mrs. Mizpah Ama Dziedzorm.jpeg" },
+  { name: "Dr. Emmanuela Kwao-Boateng",         room: "C", photo: "Dr. Emmanuela Kwao Boateng.jpeg" }
 ];
 
 const ROOM_INFO = {
@@ -316,9 +316,27 @@ const ROOM_INFO = {
 
 // EDIT THIS with the real list of oral presenters per room.
 const ORAL_PRESENTERS = {
-  A: ["Presenter A1", "Presenter A2", "Presenter A3", "Presenter A4", "Presenter A5"],
-  B: ["Presenter B1", "Presenter B2", "Presenter B3", "Presenter B4", "Presenter B5"],
-  C: ["Presenter C1", "Presenter C2", "Presenter C3", "Presenter C4", "Presenter C5"]
+  A: [
+    "Turkson Jesse Takyi",
+    "Margaret Baamah Patterson",
+    "Kwabena Boakye",
+    "Lilian Akpene Diaba"
+  ],
+
+  B: [
+    "George Dzidefo Torku",
+    "John Boateng Nkansah",
+    "Vincent Appiah",
+    "Delali Adjei"
+  ],
+
+  C: [
+    "Prof. James Ransford Dankwah",
+    "Jessica Dankwah",
+    "Hasan Idrees",
+    "Lucas Landwehrkamp"
+  ]
+};
 };
 
 // 20 posters, scored by ALL six chairs regardless of room.
