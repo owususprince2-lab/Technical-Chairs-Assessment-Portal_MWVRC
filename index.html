@@ -1,121 +1,761 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>MWVRC 2026 · Oral & Poster Presentation Assessment</title>
-<link rel="stylesheet" href="css/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MWVRC 2026 · Session Chair Assessment Portal</title>
+<style>
+  :root{
+    --deep:#173a2e;
+    --green:#1f5e45;
+    --green-light:#2d6a4f;
+    --gold:#c9a227;
+    --gold-light:#e3c567;
+    --cream:#faf7ef;
+    --paper:#ffffff;
+    --ink:#1c241f;
+    --muted:#6b7570;
+    --line:#e3ddc9;
+    --danger:#b3261e;
+    --radius:14px;
+    --shadow:0 10px 30px rgba(23,58,46,0.12);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(201,162,39,0.10), transparent 40%),
+      radial-gradient(circle at 90% 10%, rgba(31,94,69,0.10), transparent 45%),
+      var(--cream);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  .topbar{
+    background:linear-gradient(120deg,var(--deep),var(--green));
+    color:#fff;
+    padding:16px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:var(--shadow);
+    position:sticky;top:0;z-index:50;
+  }
+  .topbar .brand{display:flex;align-items:center;gap:12px;}
+  .brand .logo-dot{
+    width:36px;height:36px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 70%);
+    box-shadow:0 0 0 3px rgba(255,255,255,0.15);
+    flex-shrink:0;
+  }
+  .brand h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.3px;}
+  .brand span{display:block;font-size:11px;color:var(--gold-light);font-weight:500;}
+  .topbar .who{font-size:13px;display:flex;align-items:center;gap:10px;}
+  .topbar .who img{width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--gold-light);}
+  .btn-logout{
+    background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.3);
+    color:#fff;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;
+  }
+  .btn-logout:hover{background:rgba(255,255,255,0.22);}
+  .container{max-width:1100px;margin:0 auto;padding:28px 18px 60px;}
+  .hidden{display:none !important;}
+
+  /* ---------- Login screens ---------- */
+  .auth-wrap{max-width:760px;margin:30px auto;padding:0 14px;}
+  .auth-card{
+    background:var(--paper);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:30px;border:1px solid var(--line);
+  }
+  .auth-head{text-align:center;margin-bottom:22px;}
+  .auth-head h2{margin:6px 0 2px;color:var(--deep);font-size:22px;}
+  .auth-head p{margin:0;color:var(--muted);font-size:13px;}
+  .chair-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:18px;}
+  .chair-tile{
+    border:1px solid var(--line);border-radius:12px;padding:14px 10px;text-align:center;
+    cursor:pointer;background:#fff;transition:.15s;
+  }
+  .chair-tile:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,0.08);}
+  .chair-tile img{
+    width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:8px;
+    border:3px solid var(--gold-light);background:#eee;
+  }
+  .chair-tile .name{font-size:12.5px;font-weight:600;color:var(--deep);line-height:1.3;}
+  .chair-tile .room-tag{
+    display:inline-block;margin-top:6px;font-size:10.5px;background:var(--green);color:#fff;
+    border-radius:20px;padding:2px 8px;font-weight:600;letter-spacing:.5px;
+  }
+  .pin-screen{max-width:340px;margin:0 auto;text-align:center;}
+  .pin-screen img.avatar{
+    width:88px;height:88px;border-radius:50%;object-fit:cover;border:3px solid var(--gold);margin-bottom:10px;
+  }
+  .pin-dots{display:flex;gap:12px;justify-content:center;margin:18px 0;}
+  .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--green);background:#fff;}
+  .pin-dot.filled{background:var(--green);}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:240px;margin:0 auto;}
+  .key{
+    padding:16px 0;border-radius:10px;border:1px solid var(--line);background:#fff;
+    font-size:18px;font-weight:600;color:var(--deep);cursor:pointer;
+  }
+  .key:hover{background:var(--cream);}
+  .key.wide{font-size:13px;color:var(--muted);}
+  .small-link{font-size:12.5px;color:var(--green-light);cursor:pointer;text-decoration:underline;margin-top:14px;display:inline-block;}
+  .err-msg{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px;}
+  .ok-msg{color:var(--green);font-size:13px;margin-top:10px;min-height:18px;}
+  .back-btn{font-size:12.5px;color:var(--muted);cursor:pointer;margin-bottom:14px;display:inline-block;}
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;}
+  .tab-btn{
+    padding:9px 16px;border-radius:30px;border:1px solid var(--line);background:#fff;
+    font-size:13px;font-weight:600;color:var(--deep);cursor:pointer;
+  }
+  .tab-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:6px;}
+  .section-head h2{margin:0;color:var(--deep);font-size:19px;}
+  .section-head .badge{font-size:12px;background:var(--gold);color:#1c241f;border-radius:20px;padding:3px 10px;font-weight:700;}
+
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+  .pres-card{
+    background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;
+    transition:.15s; position:relative;
+  }
+  .pres-card:hover{box-shadow:var(--shadow);border-color:var(--gold);}
+  .pres-card .title{font-weight:700;color:var(--deep);font-size:14.5px;margin-bottom:4px;}
+  .pres-card .sub{font-size:12px;color:var(--muted);}
+  .pres-card .status{
+    position:absolute;top:12px;right:12px;font-size:10.5px;font-weight:700;border-radius:20px;
+    padding:3px 9px;
+  }
+  .status.done{background:#e6f4ea;color:#1f7a3d;}
+  .status.pending{background:#fbeede;color:#a96b15;}
+
+  /* ---------- Assessment modal ---------- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(20,30,25,0.55);display:flex;align-items:center;
+    justify-content:center;z-index:100;padding:16px;
+  }
+  .modal{
+    background:#fff;border-radius:var(--radius);max-width:560px;width:100%;max-height:90vh;
+    overflow-y:auto;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal h3{margin:0 0 2px;color:var(--deep);font-size:18px;}
+  .modal .modal-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
+  .criterion{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+  .criterion .crit-name{font-weight:700;font-size:13.5px;color:var(--deep);margin-bottom:3px;}
+  .criterion .crit-desc{font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.4;}
+  .scale-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .scale-btn{
+    flex:1;min-width:38px;text-align:center;padding:8px 0;border-radius:8px;border:1px solid var(--line);
+    background:#fff;cursor:pointer;font-weight:700;font-size:13px;color:var(--deep);
+  }
+  .scale-btn.sel{background:var(--green);color:#fff;border-color:var(--green);}
+  .total-box{
+    margin-top:8px;background:var(--cream);border:1px dashed var(--gold);border-radius:10px;
+    padding:12px;text-align:center;font-weight:700;color:var(--deep);
+  }
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .btn{
+    flex:1;padding:12px;border-radius:10px;border:none;font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .btn-primary{background:var(--green);color:#fff;}
+  .btn-primary:hover{background:var(--deep);}
+  .btn-secondary{background:#f1efe6;color:var(--deep);}
+  .btn-secondary:hover{background:#e7e3d4;}
+
+  /* ---------- Leaderboard ---------- */
+  table.lb{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--shadow);}
+  table.lb th{background:var(--green);color:#fff;text-align:left;padding:10px 12px;font-size:12.5px;}
+  table.lb td{padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;}
+  table.lb tr:last-child td{border-bottom:none;}
+  table.lb tr:nth-child(odd) td{background:#fbf9f3;}
+  .rank-1{color:var(--gold);font-weight:800;}
+  .rank-2{color:#9a9a9a;font-weight:800;}
+  .rank-3{color:#a9683b;font-weight:800;}
+  .lb-sub{font-size:11.5px;color:var(--muted);}
+  .loading{text-align:center;color:var(--muted);padding:30px;font-size:13px;}
+
+  footer{text-align:center;color:var(--muted);font-size:11.5px;padding:30px 0 10px;}
+</style>
 </head>
 <body>
 
-<div id="app">
+<div class="topbar" id="topbar" style="display:none;">
+  <div class="brand">
+    <div class="logo-dot"></div>
+    <div>
+      <h1>MWVRC 2026</h1>
+      <span>Session Chair Assessment Portal</span>
+    </div>
+  </div>
+  <div class="who" id="whoBox">
+    <img id="whoAvatar" src="" alt="">
+    <span id="whoName"></span>
+    <button class="btn-logout" onclick="logout()">Log out</button>
+  </div>
+</div>
 
-  <!-- ================= LOGIN (chair select + PIN) ================= -->
-  <div id="screen-login" class="screen">
-    <div class="login-wrap">
-      <div class="login-hero">
-        <img class="mark-lg" src="assets/logo (2).png" alt="MWVRC logo">
-        <h1>MWVRC 2026 · Oral & Poster Assessment Portal</h1>
-        <p>Technical Breakout Sessions — sign in to score the presenters in your room.</p>
+<div class="container">
+
+  <!-- ===================== AUTH: SELECT CHAIR ===================== -->
+  <div id="screen-select" class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-head">
+        <div class="logo-dot" style="margin:0 auto 10px;"></div>
+        <h2>MWVRC 2026 Assessment Portal</h2>
+        <p>Select your name to log in or set up your PIN</p>
       </div>
+      <div class="chair-grid" id="chairGrid"></div>
+    </div>
+  </div>
 
-      <div class="login-body">
-
-        <!-- Step 1: pick yourself -->
-        <div id="step-pick">
-          <p class="section-label">Select your name</p>
-          <div id="chair-grid" class="chair-grid"></div>
+  <!-- ===================== AUTH: CREATE PIN ===================== -->
+  <div id="screen-create" class="auth-wrap hidden">
+    <div class="auth-card">
+      <span class="back-btn" onclick="goSelect()">&larr; back</span>
+      <div class="pin-screen">
+        <img class="avatar" id="createAvatar" src="">
+        <div class="auth-head">
+          <h2 id="createName" style="font-size:17px;"></h2>
+          <p>No PIN found yet — create a 4-digit PIN to secure your account</p>
         </div>
-
-        <!-- Step 2: create or enter PIN -->
-        <div id="step-pin" class="hidden">
-          <button class="back-link" id="btn-back-to-pick">← Not you? Choose again</button>
-          <div class="pin-card">
-            <div class="selected-chair">
-              <div id="picked-avatar"></div>
-              <div class="meta">
-                <strong id="picked-name"></strong>
-                <span id="picked-room"></span>
-              </div>
-            </div>
-
-            <!-- create pin (first time) -->
-            <div id="create-pin-form" class="hidden">
-              <p class="pin-title">Create your 4-digit PIN</p>
-              <p class="pin-sub">No PIN is set for you yet. Choose one now — you'll use it every time you log in.</p>
-              <div class="pin-dots-input" data-group="new">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-              </div>
-              <p class="pin-sub" style="margin-bottom:8px;text-align:center;">Confirm PIN</p>
-              <div class="pin-dots-input" data-group="confirm">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-              </div>
-              <p class="field-error" id="create-pin-error"></p>
-              <button class="btn btn-primary" id="btn-create-pin">Create PIN &amp; continue</button>
-            </div>
-
-            <!-- enter pin (returning) -->
-            <div id="enter-pin-form" class="hidden">
-              <p class="pin-title">Enter your PIN</p>
-              <p class="pin-sub">Welcome back — enter your 4-digit PIN to continue.</p>
-              <div class="pin-dots-input" data-group="enter">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-                <input type="password" inputmode="numeric" maxlength="1" pattern="[0-9]*">
-              </div>
-              <p class="field-error" id="enter-pin-error"></p>
-              <button class="btn btn-primary" id="btn-login">Log in</button>
-            </div>
-
-          </div>
-        </div>
-
+        <div class="pin-dots" id="createDots"></div>
+        <div class="keypad" id="createKeypad"></div>
+        <div class="err-msg" id="createErr"></div>
+        <div class="ok-msg" id="createOk"></div>
       </div>
     </div>
   </div>
 
-  <!-- ================= MAIN APP (after login) ================= -->
+  <!-- ===================== AUTH: LOGIN WITH PIN ===================== -->
+  <div id="screen-login" class="auth-wrap hidden">
+    <div class="auth-card">
+      <span class="back-btn" onclick="goSelect()">&larr; back</span>
+      <div class="pin-screen">
+        <img class="avatar" id="loginAvatar" src="">
+        <div class="auth-head">
+          <h2 id="loginName" style="font-size:17px;"></h2>
+          <p>Enter your 4-digit PIN</p>
+        </div>
+        <div class="pin-dots" id="loginDots"></div>
+        <div class="keypad" id="loginKeypad"></div>
+        <div class="err-msg" id="loginErr"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN APP ===================== -->
   <div id="screen-app" class="hidden">
-    <div class="topbar">
-      <div class="brand"><img class="mark" src="assets/logo.png" alt="MWVRC logo"> MWVRC 2026</div>
-      <div class="who">Signed in as <strong id="nav-who"></strong> &nbsp;·&nbsp; <button class="back-link" id="btn-logout" style="color:#C9C2B2;">Log out</button></div>
-    </div>
-    <div class="tabbar">
-      <button id="tab-room" class="active">My Room (Orals)</button>
-      <button id="tab-posters">Posters</button>
-      <button id="tab-results">Results</button>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="room" onclick="switchTab('room')">🎤 My Room</button>
+      <button class="tab-btn" data-tab="posters" onclick="switchTab('posters')">🖼️ Poster Assessment</button>
+      <button class="tab-btn" data-tab="results" onclick="switchTab('results')">🏆 Results</button>
     </div>
 
-    <main>
-      <!-- Room / presenter list (Orals) -->
-      <div id="view-room" class="screen"></div>
+    <!-- ROOM / ORAL TAB -->
+    <div class="panel active" id="panel-room">
+      <div class="section-head">
+        <h2 id="roomTitle">Room</h2>
+        <span class="badge" id="roomBadge"></span>
+      </div>
+      <div class="card-grid" id="presenterGrid"></div>
+    </div>
 
-      <!-- Assessment form (Orals) -->
-      <div id="view-assess" class="screen hidden"></div>
+    <!-- POSTERS TAB -->
+    <div class="panel" id="panel-posters">
+      <div class="section-head">
+        <h2>Poster Presentations</h2>
+        <span class="badge">20 posters</span>
+      </div>
+      <div class="card-grid" id="posterGrid"></div>
+    </div>
 
-      <!-- Poster list -->
-      <div id="view-posters" class="screen hidden"></div>
-
-      <!-- Poster assessment form -->
-      <div id="view-poster-assess" class="screen hidden"></div>
-
-      <!-- Results -->
-      <div id="view-results" class="screen hidden"></div>
-    </main>
+    <!-- RESULTS TAB -->
+    <div class="panel" id="panel-results">
+      <div class="section-head"><h2>Oral Presentation Leaderboard</h2></div>
+      <div id="oralLbWrap" class="loading">Loading leaderboard…</div>
+      <div style="height:26px;"></div>
+      <div class="section-head"><h2>Poster Presentation Leaderboard</h2></div>
+      <div id="posterLbWrap" class="loading">Loading leaderboard…</div>
+    </div>
   </div>
 
 </div>
 
-<div id="toast"></div>
+<!-- ===================== ASSESSMENT MODAL ===================== -->
+<div class="overlay hidden" id="modalOverlay">
+  <div class="modal" id="modalBox"></div>
+</div>
 
-<script src="js/config.js"></script>
-<script src="js/app.js"></script>
+<footer>MWVRC 2026 · Department of Materials &amp; Metallurgical Engineering, KNUST · Internal Assessment Tool</footer>
+
+<script>
+/* ============================================================
+   CONFIG — edit names, rooms, photo filenames, presenters & posters here
+   ============================================================ */
+const API_URL = "https://script.google.com/macros/s/AKfycbyKZwHrvjiZk2nKxMbd8fYAnnkp0YpWcEarRkT2gFEhVKSzeYRw4366vZ6e-j8V07rDPg/exec";
+
+// Photos should sit in an "images/" folder next to this index.html,
+// using EXACTLY these filenames.
+const CHAIRS = [
+  { name: "Dr. Efiba Vidda Senkyire Kwarteng", room: "A", photo: "images/Dr. Efiba Vidda.jpeg" },
+  { name: "Dr. Emmanuel Kwesi Arthur",          room: "A", photo: "images/Dr. Emmanuel Arthur.jpeg" },
+  { name: "Dr. Miriam Appiah-Brempong",         room: "B", photo: "images/Dr. Miriam Brempong.jpeg" },
+  { name: "Dr. Henry Agbe",                     room: "B", photo: "images/Dr. Henry Agbe.jpeg" },
+  { name: "Dr. Mizpah Ama Dziedzorm Rockson",   room: "C", photo: "images/Dr. Mrs. Mizpah Ama Dziedzorm.jpeg" },
+  { name: "Dr. Emmanuela Kwao-Boateng",         room: "C", photo: "images/Dr. Emmanuela Kwao Boateng.jpeg" }
+];
+
+const ROOM_INFO = {
+  A: { title: "Room A — T1 & T4", sub: "Characterization & Processing of Mineral Waste · Policy & Regulatory Frameworks" },
+  B: { title: "Room B — T2", sub: "Environmental Impact, Remediation & Sustainable Management of Mineral Waste" },
+  C: { title: "Room C — T3", sub: "Waste Valorization Technologies & Circular Economy Strategies" }
+};
+
+// EDIT THIS with the real list of oral presenters per room.
+const ORAL_PRESENTERS = {
+  A: ["Presenter A1", "Presenter A2", "Presenter A3", "Presenter A4", "Presenter A5"],
+  B: ["Presenter B1", "Presenter B2", "Presenter B3", "Presenter B4", "Presenter B5"],
+  C: ["Presenter C1", "Presenter C2", "Presenter C3", "Presenter C4", "Presenter C5"]
+};
+
+// 20 posters, scored by ALL six chairs regardless of room.
+const POSTERS = Array.from({ length: 20 }, (_, i) => "Poster " + (i + 1));
+
+const ORAL_CRITERIA = [
+  { key: "c1", name: "Content & Methodology", desc: "Depth of research, soundness of methodology and analysis." },
+  { key: "c2", name: "Clarity & Structure", desc: "Logical flow, organization, and clarity of the presentation." },
+  { key: "c3", name: "Engagement & Q&A", desc: "Delivery, confidence, and handling of audience questions." },
+  { key: "c4", name: "Relevance & Impact", desc: "Contribution to mineral waste valorization and the conference theme." }
+];
+
+const POSTER_CRITERIA = [
+  { key: "c1", name: "Poster Design & Visual Appeal", max: 10,
+    desc: "10–9 Excellent: visually attractive, uncluttered, professional. 8–6 Good: clear, minor layout issues. 5–3 Fair: somewhat cluttered/hard to read. 2–1 Poor: overcrowded, graphics don't support content." },
+  { key: "c2", name: "Organization & Clarity", max: 10,
+    desc: "10–9 Excellent: logically organized, flows naturally. 8–6 Good: minor gaps. 5–3 Fair: inconsistent organization. 2–1 Poor: lacks logical structure." },
+  { key: "c3", name: "Scientific Quality & Technical Merit", max: 10,
+    desc: "10–9 Excellent: rigorous, clear methodology, well-supported. 8–6 Good: sound, adequate methodology. 5–3 Fair: weaknesses in methodology/analysis. 2–1 Poor: lacks rigor, major flaws." },
+  { key: "c4", name: "Innovation, Impact & Relevance to Mineral Waste Valorization", max: 10,
+    desc: "10–9 Excellent: innovative, clear potential impact. 8–6 Good: relevant, some impact. 5–3 Fair: partial relevance/limited innovation. 2–1 Poor: little relevance or impact." }
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let session = JSON.parse(localStorage.getItem("mwvrc_session") || "null"); // {name, room}
+let pendingChair = null; // chair object while in create/login screen
+let pinBuffer = "";
+let currentModal = null; // {type:'oral'|'poster', target, criteria, max, chair}
+let modalSelections = {};
+
+function chairByName(n){ return CHAIRS.find(c => c.name === n); }
+
+/* ============================================================
+   API HELPER
+   ============================================================ */
+async function api(action, params = {}) {
+  const url = new URL(API_URL);
+  url.searchParams.set("action", action);
+  Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init() {
+  renderChairGrid();
+  if (session && session.name && session.room) {
+    enterApp();
+  } else {
+    goSelect();
+  }
+}
+
+function renderChairGrid() {
+  const grid = document.getElementById("chairGrid");
+  grid.innerHTML = "";
+  CHAIRS.forEach(c => {
+    const div = document.createElement("div");
+    div.className = "chair-tile";
+    div.onclick = () => selectChair(c);
+    div.innerHTML = `
+      <img src="${c.photo}" onerror="this.src='https://placehold.co/80x80/1f5e45/ffffff?text=${encodeURIComponent(c.name.split(' ')[1]||'DR')}'">
+      <div class="name">${c.name}</div>
+      <div class="room-tag">Room ${c.room}</div>
+    `;
+    grid.appendChild(div);
+  });
+}
+
+async function selectChair(chair) {
+  pendingChair = chair;
+  try {
+    const r = await api("checkChair", { name: chair.name });
+    if (r.hasPin) {
+      showLoginScreen(chair);
+    } else {
+      showCreateScreen(chair);
+    }
+  } catch (e) {
+    alert("Could not reach the server: " + e.message);
+  }
+}
+
+/* ============================================================
+   SCREEN NAV
+   ============================================================ */
+function showScreen(id) {
+  ["screen-select","screen-create","screen-login","screen-app"].forEach(s => {
+    document.getElementById(s).classList.toggle("hidden", s !== id);
+  });
+  document.getElementById("topbar").style.display = (id === "screen-app") ? "flex" : "none";
+}
+
+function goSelect(){ showScreen("screen-select"); }
+
+/* ---- create pin ---- */
+function showCreateScreen(chair) {
+  pinBuffer = "";
+  document.getElementById("createAvatar").src = chair.photo;
+  document.getElementById("createAvatar").onerror = function(){ this.src='https://placehold.co/90x90/1f5e45/ffffff?text=DR'; };
+  document.getElementById("createName").textContent = chair.name;
+  document.getElementById("createErr").textContent = "";
+  document.getElementById("createOk").textContent = "";
+  buildDots("createDots");
+  buildKeypad("createKeypad", onCreateKey);
+  showScreen("screen-create");
+}
+
+function onCreateKey(val) {
+  const errEl = document.getElementById("createErr");
+  errEl.textContent = "";
+  if (val === "back") { pinBuffer = pinBuffer.slice(0, -1); }
+  else if (pinBuffer.length < 4) { pinBuffer += val; }
+  updateDots("createDots");
+  if (pinBuffer.length === 4) {
+    api("createPin", { name: pendingChair.name, pin: pinBuffer }).then(r => {
+      document.getElementById("createOk").textContent = "PIN created! Logging you in…";
+      session = { name: pendingChair.name, room: r.room };
+      localStorage.setItem("mwvrc_session", JSON.stringify(session));
+      setTimeout(enterApp, 600);
+    }).catch(e => {
+      errEl.textContent = e.message;
+      pinBuffer = "";
+      updateDots("createDots");
+    });
+  }
+}
+
+/* ---- login ---- */
+function showLoginScreen(chair) {
+  pinBuffer = "";
+  document.getElementById("loginAvatar").src = chair.photo;
+  document.getElementById("loginAvatar").onerror = function(){ this.src='https://placehold.co/90x90/1f5e45/ffffff?text=DR'; };
+  document.getElementById("loginName").textContent = chair.name;
+  document.getElementById("loginErr").textContent = "";
+  buildDots("loginDots");
+  buildKeypad("loginKeypad", onLoginKey);
+  showScreen("screen-login");
+}
+
+function onLoginKey(val) {
+  const errEl = document.getElementById("loginErr");
+  errEl.textContent = "";
+  if (val === "back") { pinBuffer = pinBuffer.slice(0, -1); }
+  else if (pinBuffer.length < 4) { pinBuffer += val; }
+  updateDots("loginDots");
+  if (pinBuffer.length === 4) {
+    api("login", { name: pendingChair.name, pin: pinBuffer }).then(r => {
+      session = { name: pendingChair.name, room: r.room };
+      localStorage.setItem("mwvrc_session", JSON.stringify(session));
+      enterApp();
+    }).catch(e => {
+      errEl.textContent = e.message;
+      pinBuffer = "";
+      updateDots("loginDots");
+    });
+  }
+}
+
+function buildDots(containerId) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    const d = document.createElement("div");
+    d.className = "pin-dot";
+    c.appendChild(d);
+  }
+}
+function updateDots(containerId) {
+  const dots = document.getElementById(containerId).children;
+  for (let i = 0; i < 4; i++) dots[i].classList.toggle("filled", i < pinBuffer.length);
+}
+function buildKeypad(containerId, handler) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = "";
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","back"];
+  keys.forEach(k => {
+    const btn = document.createElement("div");
+    if (k === "") { btn.style.visibility = "hidden"; btn.className = "key"; }
+    else if (k === "back") { btn.className = "key wide"; btn.textContent = "⌫"; btn.onclick = () => handler("back"); }
+    else { btn.className = "key"; btn.textContent = k; btn.onclick = () => handler(k); }
+    c.appendChild(btn);
+  });
+}
+
+function logout() {
+  session = null;
+  localStorage.removeItem("mwvrc_session");
+  pinBuffer = "";
+  goSelect();
+}
+
+/* ============================================================
+   MAIN APP
+   ============================================================ */
+function enterApp() {
+  const chair = chairByName(session.name);
+  document.getElementById("whoAvatar").src = chair ? chair.photo : "";
+  document.getElementById("whoAvatar").onerror = function(){ this.src='https://placehold.co/40x40/1f5e45/ffffff?text=DR'; };
+  document.getElementById("whoName").textContent = session.name;
+
+  const info = ROOM_INFO[session.room];
+  document.getElementById("roomTitle").textContent = info.title;
+  document.getElementById("roomBadge").textContent = "Room " + session.room;
+
+  showScreen("screen-app");
+  renderPresenterGrid();
+  renderPosterGrid();
+  switchTab("room");
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("panel-" + tab).classList.add("active");
+  if (tab === "results") loadLeaderboards();
+}
+
+async function renderPresenterGrid() {
+  const grid = document.getElementById("presenterGrid");
+  grid.innerHTML = "";
+  const list = ORAL_PRESENTERS[session.room] || [];
+  const sub = ROOM_INFO[session.room].sub;
+  for (const presenter of list) {
+    const card = document.createElement("div");
+    card.className = "pres-card";
+    card.innerHTML = `<span class="status pending" data-status>Pending</span>
+      <div class="title">${presenter}</div>
+      <div class="sub">${sub}</div>`;
+    card.onclick = () => openOralModal(presenter);
+    grid.appendChild(card);
+    // check existing status
+    api("getMyOralScore", { chair: session.name, room: session.room, presenter }).then(r => {
+      if (r.found) {
+        const tag = card.querySelector("[data-status]");
+        tag.textContent = "Scored " + r.scaled5 + "/5";
+        tag.className = "status done";
+      }
+    }).catch(()=>{});
+  }
+}
+
+async function renderPosterGrid() {
+  const grid = document.getElementById("posterGrid");
+  grid.innerHTML = "";
+  for (const poster of POSTERS) {
+    const card = document.createElement("div");
+    card.className = "pres-card";
+    card.innerHTML = `<span class="status pending" data-status>Pending</span>
+      <div class="title">${poster}</div>
+      <div class="sub">Poster evaluation rubric · /40</div>`;
+    card.onclick = () => openPosterModal(poster);
+    grid.appendChild(card);
+    api("getMyPosterScore", { chair: session.name, poster }).then(r => {
+      if (r.found) {
+        const tag = card.querySelector("[data-status]");
+        tag.textContent = "Scored " + r.total40 + "/40";
+        tag.className = "status done";
+      }
+    }).catch(()=>{});
+  }
+}
+
+/* ============================================================
+   ASSESSMENT MODAL (works for both oral & poster)
+   ============================================================ */
+function draftKey() {
+  return "mwvrc_draft_" + currentModal.type + "_" + session.name + "_" + currentModal.target + (currentModal.room ? "_" + currentModal.room : "");
+}
+
+function saveDraft() {
+  localStorage.setItem(draftKey(), JSON.stringify(modalSelections));
+}
+function loadDraft() {
+  const raw = localStorage.getItem(draftKey());
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function openOralModal(presenter) {
+  currentModal = { type: "oral", target: presenter, room: session.room, criteria: ORAL_CRITERIA, scaleMax: 5 };
+  modalSelections = loadDraft();
+  try {
+    const r = await api("getMyOralScore", { chair: session.name, room: session.room, presenter });
+    if (r.found && Object.keys(modalSelections).length === 0) {
+      modalSelections = { c1: r.scores.c1, c2: r.scores.c2, c3: r.scores.c3, c4: r.scores.c4 };
+    }
+  } catch (e) {}
+  renderModal(`Rate: ${presenter}`, `${ROOM_INFO[session.room].title} · Rate each criterion from 1 (poor) to 5 (excellent)`);
+}
+
+async function openPosterModal(poster) {
+  currentModal = { type: "poster", target: poster, criteria: POSTER_CRITERIA, scaleMax: 10 };
+  modalSelections = loadDraft();
+  try {
+    const r = await api("getMyPosterScore", { chair: session.name, poster });
+    if (r.found && Object.keys(modalSelections).length === 0) {
+      modalSelections = { c1: r.scores.c1, c2: r.scores.c2, c3: r.scores.c3, c4: r.scores.c4 };
+    }
+  } catch (e) {}
+  renderModal(`Rate: ${poster}`, `Poster Presentation Evaluation Rubric · score each category out of 10`);
+}
+
+function renderModal(title, sub) {
+  document.getElementById("modalOverlay").classList.remove("hidden");
+  const box = document.getElementById("modalBox");
+  let html = `<h3>${title}</h3><div class="modal-sub">${sub}</div>`;
+  currentModal.criteria.forEach(crit => {
+    const max = crit.max || currentModal.scaleMax;
+    html += `<div class="criterion">
+      <div class="crit-name">${crit.name}${crit.max ? ' <span style="color:var(--muted);font-weight:500;">(/'+crit.max+')</span>' : ''}</div>
+      <div class="crit-desc">${crit.desc}</div>
+      <div class="scale-row" data-key="${crit.key}">`;
+    for (let i = 1; i <= max; i++) {
+      const sel = (modalSelections[crit.key] === i) ? "sel" : "";
+      html += `<div class="scale-btn ${sel}" data-val="${i}" onclick="pickScale('${crit.key}', ${i})">${i}</div>`;
+    }
+    html += `</div></div>`;
+  });
+  html += `<div class="total-box" id="totalBox">${totalLabel()}</div>`;
+  html += `<div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" onclick="submitModal()">Submit Score</button>
+    </div>`;
+  box.innerHTML = html;
+}
+
+function totalLabel() {
+  const vals = currentModal.criteria.map(c => modalSelections[c.key]);
+  const filled = vals.filter(v => v !== undefined);
+  if (filled.length < currentModal.criteria.length) {
+    return `Select a rating for all ${currentModal.criteria.length} criteria to see the total`;
+  }
+  const sum = vals.reduce((a,b) => a+b, 0);
+  if (currentModal.type === "oral") {
+    const scaled5 = Math.round((sum/20)*5*100)/100;
+    return `Total: ${sum} / 20  ·  Final Score: ${scaled5} / 5`;
+  } else {
+    return `Total Score: ${sum} / 40`;
+  }
+}
+
+function pickScale(key, val) {
+  modalSelections[key] = val;
+  saveDraft();
+  // re-render just the buttons + total (cheap full re-render is fine here)
+  const title = currentModal.type === "oral" ? `Rate: ${currentModal.target}` : `Rate: ${currentModal.target}`;
+  const sub = currentModal.type === "oral"
+    ? `${ROOM_INFO[session.room].title} · Rate each criterion from 1 (poor) to 5 (excellent)`
+    : `Poster Presentation Evaluation Rubric · score each category out of 10`;
+  renderModal(title, sub);
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.add("hidden");
+  currentModal = null;
+  modalSelections = {};
+}
+
+async function submitModal() {
+  const vals = currentModal.criteria.map(c => modalSelections[c.key]);
+  if (vals.some(v => v === undefined)) {
+    alert("Please rate every criterion before submitting.");
+    return;
+  }
+  const params = { chair: session.name, c1: modalSelections.c1, c2: modalSelections.c2, c3: modalSelections.c3, c4: modalSelections.c4 };
+  try {
+    if (currentModal.type === "oral") {
+      params.room = session.room;
+      params.presenter = currentModal.target;
+      await api("submitOralScore", params);
+      renderPresenterGrid();
+    } else {
+      params.poster = currentModal.target;
+      await api("submitPosterScore", params);
+      renderPosterGrid();
+    }
+    localStorage.removeItem(draftKey());
+    closeModal();
+  } catch (e) {
+    alert("Could not submit: " + e.message);
+  }
+}
+
+/* ============================================================
+   LEADERBOARDS
+   ============================================================ */
+async function loadLeaderboards() {
+  const oralWrap = document.getElementById("oralLbWrap");
+  const posterWrap = document.getElementById("posterLbWrap");
+  oralWrap.innerHTML = `<div class="loading">Loading leaderboard…</div>`;
+  posterWrap.innerHTML = `<div class="loading">Loading leaderboard…</div>`;
+
+  try {
+    const r1 = await api("leaderboardOral");
+    oralWrap.innerHTML = renderOralTable(r1.leaderboard);
+  } catch (e) {
+    oralWrap.innerHTML = `<div class="loading">Could not load: ${e.message}</div>`;
+  }
+  try {
+    const r2 = await api("leaderboardPoster");
+    posterWrap.innerHTML = renderPosterTable(r2.leaderboard);
+  } catch (e) {
+    posterWrap.innerHTML = `<div class="loading">Could not load: ${e.message}</div>`;
+  }
+}
+
+function renderOralTable(rows) {
+  if (!rows.length) return `<div class="loading">No scores submitted yet.</div>`;
+  let html = `<table class="lb"><thead><tr><th>#</th><th>Presenter</th><th>Room</th><th>Avg / 20</th><th>Avg / 5</th><th>Scores In</th></tr></thead><tbody>`;
+  rows.forEach((r, i) => {
+    const rankCls = i === 0 ? "rank-1" : i === 1 ? "rank-2" : i === 2 ? "rank-3" : "";
+    html += `<tr><td class="${rankCls}">${i+1}</td><td><strong>${r.presenter}</strong></td><td>${r.room}</td>
+      <td>${r.averageScore20}</td><td>${r.averageScore5}</td><td class="lb-sub">${r.numScores}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderPosterTable(rows) {
+  if (!rows.length) return `<div class="loading">No scores submitted yet.</div>`;
+  let html = `<table class="lb"><thead><tr><th>#</th><th>Poster</th><th>Avg / 40</th><th>Scores In (of 6)</th></tr></thead><tbody>`;
+  rows.forEach((r, i) => {
+    const rankCls = i === 0 ? "rank-1" : i === 1 ? "rank-2" : i === 2 ? "rank-3" : "";
+    html += `<tr><td class="${rankCls}">${i+1}</td><td><strong>${r.poster}</strong></td>
+      <td>${r.averageScore40}</td><td class="lb-sub">${r.numScores} / 6</td></tr>`;
+  });
+  html += `</tbody></table>`;
+  return html;
+}
+
+init();
+</script>
 </body>
 </html>
