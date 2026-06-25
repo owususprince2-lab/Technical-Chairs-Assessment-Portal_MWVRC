@@ -88,16 +88,23 @@
       <div class="who">Signed in as <strong id="nav-who"></strong> &nbsp;·&nbsp; <button class="back-link" id="btn-logout" style="color:#C9C2B2;">Log out</button></div>
     </div>
     <div class="tabbar">
-      <button id="tab-room" class="active">My Room</button>
+      <button id="tab-room" class="active">My Room (Orals)</button>
+      <button id="tab-posters">Posters</button>
       <button id="tab-results">Results</button>
     </div>
 
     <main>
-      <!-- Room / presenter list -->
+      <!-- Room / presenter list (Orals) -->
       <div id="view-room" class="screen"></div>
 
-      <!-- Assessment form -->
+      <!-- Assessment form (Orals) -->
       <div id="view-assess" class="screen hidden"></div>
+
+      <!-- Poster list -->
+      <div id="view-posters" class="screen hidden"></div>
+
+      <!-- Poster assessment form -->
+      <div id="view-poster-assess" class="screen hidden"></div>
 
       <!-- Results -->
       <div id="view-results" class="screen hidden"></div>
