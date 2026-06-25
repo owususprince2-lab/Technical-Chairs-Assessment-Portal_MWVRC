@@ -1,600 +1,576 @@
-/* MWVRC 2026 — Oral Presentation Assessment Portal — Frontend logic */
+/* ═══════════════════════════════════════════
+   MWVRC 2026 — App Logic
+   ═══════════════════════════════════════════ */
 
-const STORAGE_KEY = 'mwvrc_session';
-const DRAFT_PREFIX = 'mwvrc_draft_'; // local safety-net cache, mirrors what's saved server-side
-const CORE_COLORS = ['rust','moss','ochre','ink'];
-
-let session = null;     // {name, room}
-let pickedChair = null; // chair object while on the login screen
-let currentPresenter = null; // {presenterName, room, theme, presentationTitle}
-let currentScores = {};      // {c1: 1-5, ..., c10: 1-5}
-let currentMeta = { keyStrengths: '', areasForImprovement: '' };
-let currentStatus = 'none';  // none | draft | submitted
-let presentersCache = [];
-let resultsFilter = 'all';
-
-// ---------------------------------------------------------------- helpers --
-
-function $(sel, root=document){ return root.querySelector(sel); }
-function $all(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
-
-function initials(name){
-  return name.replace(/^Dr\.?\s*(Mrs\.?)?\s*/i,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-}
-
-function showToast(msg, isError){
-  const t = $('#toast');
-  t.textContent = msg;
-  t.className = isError ? 'show error' : 'show';
-  clearTimeout(showToast._t);
-  showToast._t = setTimeout(()=> t.className = '', 2400);
-}
-
-function setLoading(btn, loading, label){
-  if (loading){
-    btn.dataset.label = btn.dataset.label || btn.textContent;
-    btn.innerHTML = '<span class="loader"></span>';
-    btn.disabled = true;
-  } else {
-    btn.textContent = label || btn.dataset.label || btn.textContent;
-    btn.disabled = false;
+/* ── Application state ── */
+const state = {
+  oral: {
+    chairId: null,
+    scores: {},
+    submissions: []          // { chairId, presenter, scores, total, timestamp }
+  },
+  poster: {
+    chairId: null,
+    scores: {},
+    currentPoster: null,
+    submissions: []          // { chairId, poster, scores, total, timestamp }
   }
-}
+};
 
-function weightedTotal(scores){
-  return CONFIG.CRITERIA.reduce((sum, c) => {
-    const r = Number(scores[c.key]);
-    return sum + ((r >= 1 && r <= 5) ? (r / 5) * c.weight : 0);
-  }, 0);
-}
-function ratedCount(scores){
-  return CONFIG.CRITERIA.filter(c => Number(scores[c.key]) >= 1 && Number(scores[c.key]) <= 5).length;
-}
+/* ══════════════════════════════════════════
+   TAB & SEGMENT NAVIGATION
+══════════════════════════════════════════ */
 
-// ----------------------------------------------------------------- API ----
-// We POST as text/plain to avoid a CORS preflight (Apps Script doesn't handle
-// OPTIONS). The server parses e.postData.contents as JSON regardless.
-
-async function apiGet(params){
-  const url = new URL(CONFIG.API_URL);
-  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
-  return res.json();
-}
-
-async function apiPost(body){
-  const res = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body)
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['oral', 'poster', 'results'][i] === tab);
   });
-  return res.json();
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'results') renderResults();
 }
 
-// -------------------------------------------------------------- session ---
-
-function saveSession(s){ session = s; localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
-function loadSession(){ try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e){ return null; } }
-function clearSession(){ session = null; localStorage.removeItem(STORAGE_KEY); }
-
-// --------------------------------------------------------- screen control -
-
-function showLoginScreen(){
-  $('#screen-login').classList.remove('hidden');
-  $('#screen-app').classList.add('hidden');
-}
-function showAppScreen(){
-  $('#screen-login').classList.add('hidden');
-  $('#screen-app').classList.remove('hidden');
-  $('#nav-who').textContent = session.name;
-  goToRoomTab();
-}
-function setActiveTab(tab){
-  $('#tab-room').classList.toggle('active', tab==='room');
-  $('#tab-results').classList.toggle('active', tab==='results');
-  $('#view-room').classList.toggle('hidden', tab!=='room');
-  $('#view-assess').classList.toggle('hidden', true);
-  $('#view-results').classList.toggle('hidden', tab!=='results');
+function switchResults(tab) {
+  document.querySelectorAll('.seg-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', ['oral', 'poster'][i] === tab);
+  });
+  document.getElementById('results-oral').style.display   = tab === 'oral'   ? 'block' : 'none';
+  document.getElementById('results-poster').style.display = tab === 'poster' ? 'block' : 'none';
 }
 
-// ============================================================ LOGIN FLOW ==
+/* ══════════════════════════════════════════
+   ORAL — CHAIR SELECTION
+══════════════════════════════════════════ */
 
-// One global handler covers every <img class="avatar"> on the page — if the
-// photo file isn't there yet, swap it for a clean initials circle.
-document.addEventListener('error', (e) => {
-  const img = e.target;
-  if (!(img.tagName === 'IMG' && img.classList.contains('avatar'))) return;
-  const div = document.createElement('div');
-  div.className = img.className;
-  div.textContent = img.dataset.initials || '';
-  img.replaceWith(div);
-}, true);
+function renderOralChairs() {
+  const container = document.getElementById('oral-chairs-list');
+  container.innerHTML = '';
 
-function avatarMarkup(chair, sizeClass){
-  const cls = 'avatar' + (sizeClass ? ' ' + sizeClass : '');
-  const src = `assets/chairs/${encodeURIComponent(chair.photo)}`;
-  return `<img class="${cls}" src="${src}" alt="${chair.name}" data-initials="${initials(chair.name)}">`;
-}
-
-function renderChairGrid(){
-  const grid = $('#chair-grid');
-  grid.innerHTML = '';
-  CONFIG.CHAIRS.forEach(chair => {
-    const card = document.createElement('div');
-    card.className = 'chair-card';
-    card.dataset.room = chair.room;
-    card.innerHTML = `
-      ${avatarMarkup(chair)}
-      <div class="name">${chair.name}</div>
-      <span class="room-pill ${chair.room}">Room ${chair.room}</span>
-    `;
-    card.addEventListener('click', () => pickChair(chair));
-    grid.appendChild(card);
+  CHAIRS.forEach(chair => {
+    const div = document.createElement('div');
+    div.className = 'chair-select-card' + (state.oral.chairId === chair.id ? ' active' : '');
+    div.innerHTML = `
+      <div class="chair-name">${chair.name}</div>
+      <div class="chair-dept">${chair.dept}</div>
+      <span class="chip">Room ${chair.room}</span>
+      <span class="chip">Presenters ${chair.oral[0]}–${chair.oral[chair.oral.length - 1]}</span>`;
+    div.onclick = () => {
+      state.oral.chairId = chair.id;
+      showOralForm(chair);
+    };
+    container.appendChild(div);
   });
 }
 
-async function pickChair(chair){
-  pickedChair = chair;
-  $('#step-pick').classList.add('hidden');
-  $('#step-pin').classList.remove('hidden');
-  $('#picked-name').textContent = chair.name;
-  $('#picked-room').textContent = `Room ${chair.room} · ${chair.title}`;
-  $('#picked-avatar').innerHTML = avatarMarkup(chair, 'sm');
+function showOralForm(chair) {
+  document.getElementById('oral-chair-select').style.display = 'none';
+  document.getElementById('oral-form').style.display         = 'block';
 
-  $('#create-pin-form').classList.add('hidden');
-  $('#enter-pin-form').classList.add('hidden');
-  clearPinInputs('new'); clearPinInputs('confirm'); clearPinInputs('enter');
-  $('#create-pin-error').textContent = '';
-  $('#enter-pin-error').textContent = '';
-
-  try {
-    const res = await apiGet({ action: 'getChairs' });
-    const match = (res.chairs || []).find(c => c.name === chair.name);
-    if (match && match.pinSet){
-      $('#enter-pin-form').classList.remove('hidden');
-      focusPinGroup('enter');
-    } else {
-      $('#create-pin-form').classList.remove('hidden');
-      focusPinGroup('new');
-    }
-  } catch (e){
-    showToast('Could not reach the server. Check your connection.', true);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  $('#btn-back-to-pick').addEventListener('click', () => {
-    $('#step-pick').classList.remove('hidden');
-    $('#step-pin').classList.add('hidden');
-    pickedChair = null;
+  // Populate presenter dropdown with this chair's assigned presenters
+  const sel = document.getElementById('oral-presenter');
+  sel.innerHTML = '<option value="">— Select presenter —</option>';
+  chair.oral.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = 'Presenter ' + n;
+    sel.appendChild(opt);
   });
 
-  $all('.pin-dots-input').forEach(group => {
-    const inputs = $all('input', group);
-    inputs.forEach((inp, idx) => {
-      inp.addEventListener('input', () => {
-        inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,1);
-        if (inp.value && idx < inputs.length-1) inputs[idx+1].focus();
-      });
-      inp.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !inp.value && idx>0) inputs[idx-1].focus();
-      });
-    });
-  });
-
-  $('#btn-create-pin').addEventListener('click', onCreatePin);
-  $('#btn-login').addEventListener('click', onLogin);
-  $('#btn-logout').addEventListener('click', (e) => {
-    e.preventDefault();
-    clearSession();
-    currentPresenter = null;
-    location.reload();
-  });
-  $('#tab-room').addEventListener('click', goToRoomTab);
-  $('#tab-results').addEventListener('click', goToResultsTab);
-
-  init();
-});
-
-function clearPinInputs(group){ $all(`.pin-dots-input[data-group="${group}"] input`).forEach(i => i.value = ''); }
-function readPinInputs(group){ return $all(`.pin-dots-input[data-group="${group}"] input`).map(i => i.value).join(''); }
-function focusPinGroup(group){ const f = $(`.pin-dots-input[data-group="${group}"] input`); if (f) setTimeout(()=>f.focus(), 50); }
-
-async function onCreatePin(){
-  const pin = readPinInputs('new');
-  const confirm = readPinInputs('confirm');
-  const errEl = $('#create-pin-error');
-  errEl.textContent = '';
-  if (pin.length !== 4){ errEl.textContent = 'Enter all 4 digits.'; return; }
-  if (pin !== confirm){ errEl.textContent = 'PINs do not match.'; return; }
-
-  const btn = $('#btn-create-pin');
-  setLoading(btn, true);
-  try {
-    const res = await apiPost({ action:'createPin', name: pickedChair.name, pin });
-    if (res.success){
-      saveSession({ name: pickedChair.name, room: res.room });
-      showToast('PIN created. Welcome!');
-      showAppScreen();
-    } else {
-      errEl.textContent = res.error || 'Could not create PIN.';
-    }
-  } catch(e){
-    errEl.textContent = 'Network error — please try again.';
-  } finally {
-    setLoading(btn, false, 'Create PIN & continue');
-  }
+  state.oral.scores = {};
+  renderOralRubric();
 }
 
-async function onLogin(){
-  const pin = readPinInputs('enter');
-  const errEl = $('#enter-pin-error');
-  errEl.textContent = '';
-  if (pin.length !== 4){ errEl.textContent = 'Enter all 4 digits.'; return; }
-
-  const btn = $('#btn-login');
-  setLoading(btn, true);
-  try {
-    const res = await apiPost({ action:'login', name: pickedChair.name, pin });
-    if (res.success){
-      saveSession({ name: pickedChair.name, room: res.room });
-      showAppScreen();
-    } else {
-      errEl.textContent = res.error || 'Incorrect PIN.';
-      clearPinInputs('enter');
-      focusPinGroup('enter');
-    }
-  } catch(e){
-    errEl.textContent = 'Network error — please try again.';
-  } finally {
-    setLoading(btn, false, 'Log in');
-  }
+function backToOralChairs() {
+  document.getElementById('oral-chair-select').style.display = 'block';
+  document.getElementById('oral-form').style.display         = 'none';
+  state.oral.chairId = null;
+  renderOralChairs();
 }
 
-// ============================================================ ROOM VIEW ===
+/* ══════════════════════════════════════════
+   ORAL — RUBRIC RENDERING & SCORING
+══════════════════════════════════════════ */
 
-async function goToRoomTab(){
-  setActiveTab('room');
-  await renderRoomView();
-}
+function renderOralRubric() {
+  const container = document.getElementById('oral-rubric-items');
+  container.innerHTML = '';
 
-async function renderRoomView(){
-  const root = $('#view-room');
-  const roomInfo = CONFIG.ROOMS[session.room];
-  root.innerHTML = `
-    <div class="room-banner ${session.room}">
-      <div class="room-tag">Room ${session.room}</div>
-      <h2>${roomInfo.label}</h2>
-      <div class="themes">${roomInfo.themes.join('<br>')}</div>
-    </div>
-    <p class="section-label">Presenters</p>
-    <div id="presenter-list" class="presenter-list">
-      <div class="center-loading"><span class="loader" style="border-color:#0002;border-top-color:var(--ink);"></span></div>
-    </div>
-  `;
-
-  try {
-    const [presRes, statusRes] = await Promise.all([
-      apiGet({ action:'getPresenters', room: session.room }),
-      apiGet({ action:'getMyAssessments', chair: session.name })
-    ]);
-    presentersCache = presRes.presenters || [];
-    const statusByPresenter = {};
-    (statusRes.assessments || []).forEach(a => statusByPresenter[a.presenterName] = a);
-
-    const list = $('#presenter-list');
-    if (presentersCache.length === 0){
-      list.innerHTML = `<div class="empty-state">No presenters have been added to this room yet.<br>Ask the organiser to add them to the "Presenters" sheet tab.</div>`;
-      return;
-    }
-    list.innerHTML = '';
-    presentersCache.forEach(p => {
-      const a = statusByPresenter[p.presenterName];
-      const status = a ? a.status.toLowerCase() : 'none';
-      const card = document.createElement('div');
-      card.className = 'presenter-card';
-      card.innerHTML = `
-        <div class="core-sample">${renderCoreLayers(a ? a.scores : null)}</div>
-        <div class="info">
-          <div class="pname">${p.presenterName}</div>
-          <div class="ptheme">${p.presentationTitle || p.theme || ''}</div>
-        </div>
-        <div class="status-chip ${status}">${status==='none' ? 'Not scored' : status}</div>
-      `;
-      card.addEventListener('click', () => openAssessment(p));
-      list.appendChild(card);
-    });
-  } catch(e){
-    $('#presenter-list').innerHTML = `<div class="empty-state">Could not load presenters. Check your connection and try again.</div>`;
-  }
-}
-
-function renderCoreLayers(scores){
-  return CONFIG.CRITERIA.map((c, i) => {
-    const v = scores ? Number(scores[c.key])||0 : 0;
-    const h = v ? (v/5*100) : 0;
-    const color = CORE_COLORS[i % CORE_COLORS.length];
-    return `<div class="layer" style="height:${h/CONFIG.CRITERIA.length}%;background:var(--${color})"></div>`;
-  }).join('');
-}
-
-// ======================================================== ASSESSMENT VIEW =
-
-async function openAssessment(presenter){
-  currentPresenter = presenter;
-  currentScores = {};
-  currentMeta = { keyStrengths: '', areasForImprovement: '' };
-  currentStatus = 'none';
-
-  $('#view-room').classList.add('hidden');
-  $('#view-results').classList.add('hidden');
-  $('#view-assess').classList.remove('hidden');
-  $('#tab-room').classList.remove('active');
-  $('#tab-results').classList.remove('active');
-
-  renderAssessmentSkeleton();
-
-  const cacheKey = DRAFT_PREFIX + session.name + '_' + presenter.presenterName;
-  try {
-    const cached = JSON.parse(localStorage.getItem(cacheKey));
-    if (cached){
-      currentScores = cached.scores || {};
-      currentMeta = cached.meta || currentMeta;
-      currentStatus = cached.status || 'draft';
-      paintAll();
-    }
-  } catch(e){}
-
-  try {
-    const res = await apiGet({ action:'getAssessment', chair: session.name, presenter: presenter.presenterName });
-    if (res.exists){
-      currentScores = res.scores;
-      currentMeta = { keyStrengths: res.keyStrengths || '', areasForImprovement: res.areasForImprovement || '' };
-      currentStatus = res.status.toLowerCase();
-      localStorage.setItem(cacheKey, JSON.stringify({ scores: currentScores, meta: currentMeta, status: currentStatus }));
-      paintAll();
-    }
-  } catch(e){ /* keep whatever we have locally */ }
-}
-
-function renderAssessmentSkeleton(){
-  const root = $('#view-assess');
-  root.innerHTML = `
-    <button class="back-link" id="btn-back-room" style="margin-bottom:14px;">← Back to room</button>
-    <div class="assess-header">
-      <div>
-        <h2>${currentPresenter.presenterName}</h2>
-        <div class="ptheme">${currentPresenter.presentationTitle ? `“${currentPresenter.presentationTitle}”<br>` : ''}${currentPresenter.theme || ''} · Room ${currentPresenter.room}</div>
+  ORAL_RUBRIC.forEach(rubric => {
+    const wrap = document.createElement('div');
+    wrap.className = 'rubric-item';
+    wrap.innerHTML = `
+      <div class="rubric-header">
+        <span class="rubric-label">${rubric.label}</span>
+        <span class="rubric-score" id="oral-score-${rubric.key}">—/4</span>
+        <button class="info-btn" onclick="showInfo('${rubric.key}','oral')" aria-label="Scoring guide for ${rubric.label}">i</button>
       </div>
-    </div>
-
-    <div class="scale-legend">
-      <span><b>1</b> Poor</span><span><b>2</b> Fair</span><span><b>3</b> Good</span><span><b>4</b> Very Good</span><span><b>5</b> Excellent</span>
-    </div>
-
-    <div id="criteria-wrap"></div>
-
-    <div class="criterion comments-block">
-      <div class="clabel">Key Strengths</div>
-      <textarea id="input-strengths" rows="2" placeholder="What did this presenter do especially well?"></textarea>
-    </div>
-    <div class="criterion comments-block">
-      <div class="clabel">Areas for Improvement</div>
-      <textarea id="input-improve" rows="2" placeholder="What could be stronger next time?"></textarea>
-    </div>
-
-    <div class="score-summary">
-      <div class="core-sample" id="summary-core"></div>
-      <div>
-        <div class="total" id="summary-total">0.0<span>/${CONFIG.MAX_TOTAL}</span></div>
-        <div class="sub" id="summary-sub">No ratings yet</div>
-      </div>
-    </div>
-
-    <div class="save-row">
-      <button class="btn btn-primary" id="btn-submit">Submit assessment</button>
-    </div>
-    <p class="autosave-note" id="autosave-note">Saves automatically as you go.</p>
-  `;
-
-  const wrap = $('#criteria-wrap');
-  CONFIG.CRITERIA.forEach(c => {
-    const block = document.createElement('div');
-    block.className = 'criterion';
-    block.innerHTML = `
-      <div class="clabel-row">
-        <div class="clabel">${c.label}</div>
-        <div class="weight-badge">${c.weight}%</div>
-      </div>
-      <div class="cdesc">${c.desc}</div>
-      <div class="rating-row" data-key="${c.key}">
-        ${[1,2,3,4,5].map(n => `<button class="rating-btn" data-val="${n}">${n}</button>`).join('')}
-      </div>
-      <div class="weighted-line" id="weighted-${c.key}">Weighted: 0.0 / ${c.weight}</div>
-    `;
-    wrap.appendChild(block);
+      <div class="rating-row">
+        ${[1, 2, 3, 4].map(v => `
+          <button
+            class="rating-btn"
+            data-key="${rubric.key}"
+            data-val="${v}"
+            onclick="setOralScore('${rubric.key}', ${v})"
+            aria-label="Rate ${v} — ${['Poor','Fair','Good','Excellent'][v-1]}">
+            ${v}<span class="rlabel">${['Poor','Fair','Good','Excellent'][v-1]}</span>
+          </button>`).join('')}
+      </div>`;
+    container.appendChild(wrap);
   });
 
-  $all('.rating-row').forEach(row => {
-    const key = row.dataset.key;
-    $all('.rating-btn', row).forEach(btn => {
-      btn.addEventListener('click', () => {
-        currentScores[key] = Number(btn.dataset.val);
-        paintAll();
-        scheduleAutoSave();
-      });
-    });
+  updateOralTotal();
+}
+
+function setOralScore(key, val) {
+  state.oral.scores[key] = val;
+  document.querySelectorAll(`.rating-btn[data-key="${key}"]`).forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.val) === val);
   });
-
-  $('#input-strengths').value = currentMeta.keyStrengths || '';
-  $('#input-improve').value = currentMeta.areasForImprovement || '';
-  $('#input-strengths').addEventListener('input', (e) => { currentMeta.keyStrengths = e.target.value; scheduleAutoSave(); });
-  $('#input-improve').addEventListener('input', (e) => { currentMeta.areasForImprovement = e.target.value; scheduleAutoSave(); });
-
-  $('#btn-back-room').addEventListener('click', goToRoomTab);
-  $('#btn-submit').addEventListener('click', submitAssessment);
+  document.getElementById('oral-score-' + key).textContent = val + '/4';
+  updateOralTotal();
 }
 
-function paintAll(){
-  CONFIG.CRITERIA.forEach(c => {
-    const row = $(`.rating-row[data-key="${c.key}"]`);
-    if (!row) return;
-    $all('.rating-btn', row).forEach(btn => {
-      btn.classList.toggle('active', Number(btn.dataset.val) === currentScores[c.key]);
-    });
-    const r = Number(currentScores[c.key]);
-    const w = (r >= 1 && r <= 5) ? ((r/5) * c.weight) : 0;
-    const wEl = $(`#weighted-${c.key}`);
-    if (wEl) wEl.textContent = `Weighted: ${w.toFixed(1)} / ${c.weight}`;
-  });
-
-  const sInput = $('#input-strengths'); if (sInput && sInput.value !== currentMeta.keyStrengths) sInput.value = currentMeta.keyStrengths || '';
-  const iInput = $('#input-improve'); if (iInput && iInput.value !== currentMeta.areasForImprovement) iInput.value = currentMeta.areasForImprovement || '';
-
-  const rated = ratedCount(currentScores);
-  const total = weightedTotal(currentScores);
-  $('#summary-total').innerHTML = `${total.toFixed(1)}<span>/${CONFIG.MAX_TOTAL}</span>`;
-  $('#summary-sub').textContent = rated === CONFIG.CRITERIA.length
-    ? `All ${CONFIG.CRITERIA.length} criteria rated`
-    : `${rated} of ${CONFIG.CRITERIA.length} criteria rated`;
-  $('#summary-core').innerHTML = renderCoreLayers(currentScores);
-
-  const submitBtn = $('#btn-submit');
-  if (submitBtn){
-    const allRated = rated === CONFIG.CRITERIA.length;
-    submitBtn.disabled = !allRated;
-    submitBtn.textContent = currentStatus === 'submitted' ? 'Update submission' : 'Submit assessment';
-  }
+function updateOralTotal() {
+  const total = ORAL_RUBRIC.reduce((sum, r) => sum + (state.oral.scores[r.key] || 0), 0);
+  document.getElementById('oral-total').textContent = total;
+  document.getElementById('oral-rating').textContent = oralRating(total);
 }
 
-function buildPayload(submitFlag){
-  return {
-    action: 'saveAssessment',
-    chairName: session.name,
-    room: currentPresenter.room,
-    presenterName: currentPresenter.presenterName,
-    scores: currentScores,
-    keyStrengths: currentMeta.keyStrengths,
-    areasForImprovement: currentMeta.areasForImprovement,
-    submit: submitFlag
-  };
-}
-
-let autoSaveTimer = null;
-function scheduleAutoSave(){
-  const cacheKey = DRAFT_PREFIX + session.name + '_' + currentPresenter.presenterName;
-  localStorage.setItem(cacheKey, JSON.stringify({ scores: currentScores, meta: currentMeta, status: currentStatus }));
-
-  clearTimeout(autoSaveTimer);
-  const note = $('#autosave-note');
-  autoSaveTimer = setTimeout(async () => {
-    try {
-      const submitFlag = currentStatus === 'submitted'; // already-submitted edits stay submitted
-      const res = await apiPost(buildPayload(submitFlag));
-      if (res.success){
-        if (note){ note.textContent = 'Saved ✓'; note.classList.add('active'); }
-        setTimeout(()=>{ if(note){ note.textContent='Saves automatically as you go.'; note.classList.remove('active'); } }, 1400);
-      }
-    } catch(e){ /* local cache already has it; will reconcile on next open */ }
-  }, 600);
-}
-
-async function submitAssessment(){
-  const rated = ratedCount(currentScores);
-  if (rated !== CONFIG.CRITERIA.length){ showToast('Rate all criteria before submitting.', true); return; }
-
-  const btn = $('#btn-submit');
-  setLoading(btn, true);
-  try {
-    const res = await apiPost(buildPayload(true));
-    if (res.success){
-      currentStatus = 'submitted';
-      const cacheKey = DRAFT_PREFIX + session.name + '_' + currentPresenter.presenterName;
-      localStorage.setItem(cacheKey, JSON.stringify({ scores: currentScores, meta: currentMeta, status: currentStatus }));
-      showToast('Assessment submitted to the score sheet.');
-    } else {
-      showToast(res.error || 'Could not submit. Try again.', true);
-    }
-  } catch(e){
-    showToast('Network error — your ratings are saved on this device, retry when back online.', true);
-  } finally {
-    setLoading(btn, false);
-    paintAll();
-  }
-}
-
-// ============================================================ RESULTS ====
-
-async function goToResultsTab(){
-  currentPresenter = null;
-  $('#view-room').classList.add('hidden');
-  $('#view-assess').classList.add('hidden');
-  $('#view-results').classList.remove('hidden');
-  $('#tab-room').classList.remove('active');
-  $('#tab-results').classList.add('active');
-  await renderResultsView();
-}
-
-async function renderResultsView(){
-  const root = $('#view-results');
-  root.innerHTML = `
-    <p class="section-label">Leaderboard — best oral presenter</p>
-    <div class="results-toolbar" id="results-filters">
-      ${['all','A','B','C'].map(r => `<button class="filter-chip ${r==='all'?'active':''}" data-room="${r}">${r==='all'?'All rooms':'Room '+r}</button>`).join('')}
-    </div>
-    <div id="results-list"><div class="center-loading"><span class="loader" style="border-color:#0002;border-top-color:var(--ink);"></span></div></div>
-  `;
-
-  $all('.filter-chip', root).forEach(chip => {
-    chip.addEventListener('click', () => {
-      resultsFilter = chip.dataset.room;
-      $all('.filter-chip', root).forEach(c => c.classList.toggle('active', c===chip));
-      paintResults(window._lastResults || []);
-    });
-  });
-
-  try {
-    const res = await apiGet({ action:'getResults' });
-    window._lastResults = res.results || [];
-    paintResults(window._lastResults);
-  } catch(e){
-    $('#results-list').innerHTML = `<div class="empty-state">Could not load results. Check your connection and try again.</div>`;
-  }
-}
-
-function paintResults(results){
-  const list = $('#results-list');
-  const filtered = resultsFilter === 'all' ? results : results.filter(r => r.room === resultsFilter);
-  if (filtered.length === 0){
-    list.innerHTML = `<div class="empty-state">No submitted assessments yet for this filter.</div>`;
+function submitOral() {
+  const presenterVal = document.getElementById('oral-presenter').value;
+  if (!presenterVal) {
+    showAlert('oral-alert', 'Please select a presenter before submitting.', 'err');
     return;
   }
-  const medals = {1:'🥇',2:'🥈',3:'🥉'};
-  list.innerHTML = filtered.map((r, idx) => {
-    const rank = idx+1;
-    const topClass = rank<=3 ? `top${rank}` : '';
-    return `
-      <div class="result-row ${topClass}">
-        <div class="rank">${medals[rank] ? `<span class="medal">${medals[rank]}</span>` : rank}</div>
-        <div class="rinfo">
-          <div class="rname">${r.presenterName}</div>
-          <div class="rmeta">${r.presentationTitle ? r.presentationTitle + ' · ' : ''}Room ${r.room} · ${r.assessorsCount} assessor${r.assessorsCount===1?'':'s'}</div>
-        </div>
-        <div class="rscore">${r.averageTotal}<span>/${r.maxTotal}</span></div>
-      </div>
-    `;
-  }).join('');
-}
 
-// ============================================================== BOOT =====
-
-function init(){
-  renderChairGrid();
-  const existing = loadSession();
-  if (existing){
-    session = existing;
-    showAppScreen();
-  } else {
-    showLoginScreen();
+  const missing = ORAL_RUBRIC.filter(r => !state.oral.scores[r.key]);
+  if (missing.length) {
+    showAlert('oral-alert', `Please rate all categories. ${missing.length} still unrated.`, 'err');
+    return;
   }
+
+  const total = ORAL_RUBRIC.reduce((sum, r) => sum + state.oral.scores[r.key], 0);
+  const entry = {
+    chairId: state.oral.chairId,
+    presenter: parseInt(presenterVal),
+    scores: { ...state.oral.scores },
+    total,
+    timestamp: Date.now()
+  };
+
+  // Overwrite if same chair already scored this presenter
+  const idx = state.oral.submissions.findIndex(
+    x => x.chairId === entry.chairId && x.presenter === entry.presenter
+  );
+  if (idx >= 0) state.oral.submissions[idx] = entry;
+  else          state.oral.submissions.push(entry);
+
+  showAlert('oral-alert',
+    `Assessment submitted! Presenter ${presenterVal} — ${total}/32 (${oralRating(total)})`, 'ok');
+
+  // Reset for next presenter
+  state.oral.scores = {};
+  document.getElementById('oral-presenter').value = '';
+  renderOralRubric();
 }
+
+function clearOralForm() {
+  state.oral.scores = {};
+  document.getElementById('oral-presenter').value = '';
+  document.getElementById('oral-alert').innerHTML = '';
+  renderOralRubric();
+}
+
+/* ══════════════════════════════════════════
+   POSTER — CHAIR SELECTION
+══════════════════════════════════════════ */
+
+function renderPosterChairs() {
+  const container = document.getElementById('poster-chairs-list');
+  container.innerHTML = '';
+
+  CHAIRS.forEach(chair => {
+    const count = state.poster.submissions.filter(x => x.chairId === chair.id).length;
+    const div = document.createElement('div');
+    div.className = 'chair-select-card' + (state.poster.chairId === chair.id ? ' active' : '');
+    div.innerHTML = `
+      <div class="chair-name">${chair.name}</div>
+      <div class="chair-dept">${chair.dept}</div>
+      <span class="chip">Room ${chair.room}</span>
+      <span class="chip">${count}/20 posters assessed</span>`;
+    div.onclick = () => {
+      state.poster.chairId = chair.id;
+      showPosterForm();
+    };
+    container.appendChild(div);
+  });
+}
+
+function showPosterForm() {
+  document.getElementById('poster-chair-select').style.display = 'none';
+  document.getElementById('poster-form').style.display         = 'block';
+  document.getElementById('poster-rubric-section').style.display = 'none';
+  state.poster.currentPoster = null;
+  state.poster.scores = {};
+  renderPosterGrid();
+}
+
+function backToPosterChairs() {
+  document.getElementById('poster-chair-select').style.display = 'block';
+  document.getElementById('poster-form').style.display         = 'none';
+  document.getElementById('poster-rubric-section').style.display = 'none';
+  state.poster.chairId      = null;
+  state.poster.currentPoster = null;
+  state.poster.scores       = {};
+  renderPosterChairs();
+}
+
+/* ══════════════════════════════════════════
+   POSTER — GRID & SCORING
+══════════════════════════════════════════ */
+
+function renderPosterGrid() {
+  const grid = document.getElementById('poster-grid');
+  grid.innerHTML = '';
+
+  const submitted = state.poster.submissions
+    .filter(x => x.chairId === state.poster.chairId)
+    .map(x => x.poster);
+
+  for (let i = 1; i <= 20; i++) {
+    const done     = submitted.includes(i);
+    const selected = state.poster.currentPoster === i;
+    const tile = document.createElement('div');
+    tile.className = 'poster-tile' + (done ? ' submitted' : '') + (selected ? ' selected' : '');
+    tile.innerHTML = 'P' + i + (done ? '<span class="pt-check">✓</span>' : '');
+    tile.onclick   = () => selectPoster(i);
+    grid.appendChild(tile);
+  }
+
+  const count = submitted.length;
+  document.getElementById('poster-progress').style.width = (count / 20 * 100) + '%';
+  document.getElementById('poster-progress-label').textContent = count + ' of 20 assessed';
+}
+
+function selectPoster(n) {
+  state.poster.currentPoster = n;
+
+  // Pre-fill existing scores if this poster was already scored by this chair
+  const existing = state.poster.submissions.find(
+    x => x.chairId === state.poster.chairId && x.poster === n
+  );
+  state.poster.scores = existing ? { ...existing.scores } : {};
+
+  document.getElementById('poster-current-label').textContent = 'Poster ' + n;
+  document.getElementById('poster-rubric-section').style.display = 'block';
+
+  renderPosterGrid();
+  renderPosterRubric();
+  document.getElementById('poster-rubric-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPosterRubric() {
+  const container = document.getElementById('poster-rubric-items');
+  container.innerHTML = '';
+
+  POSTER_RUBRIC.forEach(rubric => {
+    const currentVal = state.poster.scores[rubric.key] || null;
+    const wrap = document.createElement('div');
+    wrap.className = 'rubric-item';
+    wrap.innerHTML = `
+      <div class="rubric-header">
+        <span class="rubric-label">${rubric.label}</span>
+        <span class="rubric-score" id="poster-score-${rubric.key}">
+          ${currentVal ? currentVal + '/' + rubric.max : '—/' + rubric.max}
+        </span>
+        <button class="info-btn" onclick="showInfo('${rubric.key}','poster')"
+          aria-label="Scoring guide for ${rubric.label}">i</button>
+      </div>
+      <div class="rating-area">
+        <div class="poster-rating-row">
+          ${rubric.ranges.map(([lo, hi, lbl]) => {
+            const active = currentVal && currentVal >= lo && currentVal <= hi;
+            return `<button class="poster-rating-btn${active ? ' selected' : ''}"
+              onclick="setPosterRangeMidpoint('${rubric.key}', ${lo}, ${hi}, ${rubric.max})">
+              ${lo}${lo !== hi ? '–' + hi : ''}<br><span style="font-size:9px">${lbl}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="poster-score-input-row">
+        <label>Exact score (1–${rubric.max}):</label>
+        <input
+          type="number"
+          min="1"
+          max="${rubric.max}"
+          step="1"
+          id="poster-num-${rubric.key}"
+          value="${currentVal || ''}"
+          placeholder="1–${rubric.max}"
+          oninput="setPosterScore('${rubric.key}', this.value, ${rubric.max})"
+        />
+      </div>`;
+    container.appendChild(wrap);
+  });
+
+  updatePosterTotal();
+}
+
+function setPosterRangeMidpoint(key, lo, hi, max) {
+  // If already in range, keep current; else use midpoint
+  const cur = state.poster.scores[key];
+  const val = (cur && cur >= lo && cur <= hi) ? cur : Math.round((lo + hi) / 2);
+  const input = document.getElementById('poster-num-' + key);
+  input.value = val;
+  applyPosterScore(key, val, max);
+  input.focus();
+}
+
+function setPosterScore(key, raw, max) {
+  const parsed = parseInt(raw);
+  if (!raw || isNaN(parsed)) return;         // allow partial typing
+  const val = Math.min(max, Math.max(1, parsed));
+  applyPosterScore(key, val, max);
+}
+
+function applyPosterScore(key, val, max) {
+  state.poster.scores[key] = val;
+  document.getElementById('poster-score-' + key).textContent = val + '/' + max;
+
+  const rubric  = POSTER_RUBRIC.find(r => r.key === key);
+  const buttons = document.querySelectorAll(`#poster-rubric-items .poster-rating-btn`);
+  // Update only buttons belonging to this rubric item
+  const item = document.getElementById('poster-num-' + key).closest('.rubric-item');
+  item.querySelectorAll('.poster-rating-btn').forEach((btn, i) => {
+    const [lo, hi] = rubric.ranges[i];
+    btn.classList.toggle('selected', val >= lo && val <= hi);
+  });
+
+  updatePosterTotal();
+}
+
+function updatePosterTotal() {
+  const total = POSTER_RUBRIC.reduce((sum, r) => sum + (state.poster.scores[r.key] || 0), 0);
+  document.getElementById('poster-total').textContent = total;
+  document.getElementById('poster-rating').textContent = posterRating(total);
+}
+
+function submitPoster() {
+  if (!state.poster.currentPoster) {
+    showAlert('poster-alert', 'Please select a poster from the grid above.', 'err');
+    return;
+  }
+
+  const missing = POSTER_RUBRIC.filter(r => !state.poster.scores[r.key]);
+  if (missing.length) {
+    showAlert('poster-alert', `Please score all categories. ${missing.length} still unscored.`, 'err');
+    return;
+  }
+
+  const total = POSTER_RUBRIC.reduce((sum, r) => sum + state.poster.scores[r.key], 0);
+  const entry = {
+    chairId: state.poster.chairId,
+    poster:  state.poster.currentPoster,
+    scores:  { ...state.poster.scores },
+    total,
+    timestamp: Date.now()
+  };
+
+  const idx = state.poster.submissions.findIndex(
+    x => x.chairId === entry.chairId && x.poster === entry.poster
+  );
+  if (idx >= 0) state.poster.submissions[idx] = entry;
+  else          state.poster.submissions.push(entry);
+
+  showAlert('poster-alert',
+    `Poster ${state.poster.currentPoster} assessed! Score: ${total}/40 (${posterRating(total)})`, 'ok');
+
+  // Reset for next poster
+  state.poster.currentPoster = null;
+  state.poster.scores = {};
+  document.getElementById('poster-rubric-section').style.display = 'none';
+  renderPosterGrid();
+  renderPosterChairs();   // update progress chips on chair cards
+}
+
+function clearPosterForm() {
+  state.poster.scores = {};
+  document.getElementById('poster-alert').innerHTML = '';
+  renderPosterRubric();
+}
+
+/* ══════════════════════════════════════════
+   RESULTS
+══════════════════════════════════════════ */
+
+function renderResults() {
+  renderOralResults();
+  renderPosterResults();
+}
+
+/* ── Oral results ── */
+function renderOralResults() {
+  const subs = state.oral.submissions;
+  const rankCard  = document.getElementById('oral-rankings-card');
+  const chairDiv  = document.getElementById('oral-by-chair');
+
+  if (!subs.length) {
+    rankCard.innerHTML = '<p class="empty-state">No oral submissions yet.</p>';
+    chairDiv.innerHTML = '';
+    return;
+  }
+
+  // Aggregate by presenter (average if multiple assessors)
+  const byPresenter = {};
+  subs.forEach(s => {
+    if (!byPresenter[s.presenter]) byPresenter[s.presenter] = { total: 0, count: 0 };
+    byPresenter[s.presenter].total += s.total;
+    byPresenter[s.presenter].count++;
+  });
+
+  const ranked = Object.entries(byPresenter)
+    .map(([p, d]) => ({ presenter: p, avg: d.total / d.count, count: d.count }))
+    .sort((a, b) => b.avg - a.avg);
+
+  rankCard.innerHTML = ranked.map((r, i) => {
+    const medal = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    return `<div class="result-row">
+      <div class="rank-badge ${medal}">${i + 1}</div>
+      <div>
+        <div class="result-name">Presenter ${r.presenter}</div>
+        <div class="result-detail">${r.count} assessor${r.count > 1 ? 's' : ''}</div>
+      </div>
+      <div class="result-meta">
+        <div class="result-score">${r.avg.toFixed(1)}</div>
+        <div class="result-detail">/ 32</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Per-chair breakdown
+  chairDiv.innerHTML = '';
+  CHAIRS.forEach(chair => {
+    const chairSubs = subs.filter(s => s.chairId === chair.id);
+    if (!chairSubs.length) return;
+    const block = document.createElement('div');
+    block.className = 'chair-block';
+    block.innerHTML =
+      `<div class="chair-header">${chair.name}</div>` +
+      chairSubs
+        .sort((a, b) => a.presenter - b.presenter)
+        .map(s => `<div class="chair-row">
+          <span class="chair-row-name">Presenter ${s.presenter}</span>
+          <span class="chair-row-score">${s.total}/32 — ${oralRating(s.total)}</span>
+        </div>`).join('');
+    chairDiv.appendChild(block);
+  });
+}
+
+/* ── Poster results ── */
+function renderPosterResults() {
+  const subs     = state.poster.submissions;
+  const rankCard = document.getElementById('poster-rankings-card');
+  const chairDiv = document.getElementById('poster-by-chair');
+
+  if (!subs.length) {
+    rankCard.innerHTML = '<p class="empty-state">No poster submissions yet.</p>';
+    chairDiv.innerHTML = '';
+    return;
+  }
+
+  // Aggregate per poster across all chairs
+  const byPoster = {};
+  for (let i = 1; i <= 20; i++) byPoster[i] = { total: 0, count: 0 };
+  subs.forEach(s => {
+    byPoster[s.poster].total += s.total;
+    byPoster[s.poster].count++;
+  });
+
+  const ranked = Object.entries(byPoster)
+    .filter(([, d]) => d.count > 0)
+    .map(([p, d]) => ({ poster: p, avg: d.total / d.count, count: d.count }))
+    .sort((a, b) => b.avg - a.avg);
+
+  rankCard.innerHTML = ranked.map((r, i) => {
+    const medal = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    return `<div class="result-row">
+      <div class="rank-badge ${medal}">${i + 1}</div>
+      <div>
+        <div class="result-name">Poster ${r.poster}</div>
+        <div class="result-detail">${r.count} of 6 chairs assessed</div>
+      </div>
+      <div class="result-meta">
+        <div class="result-score">${r.avg.toFixed(1)}</div>
+        <div class="result-detail">/ 40 avg</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Per-chair breakdown
+  chairDiv.innerHTML = '';
+  CHAIRS.forEach(chair => {
+    const chairSubs = subs.filter(s => s.chairId === chair.id);
+    if (!chairSubs.length) return;
+    const block = document.createElement('div');
+    block.className = 'chair-block';
+    block.innerHTML =
+      `<div class="chair-header">${chair.name}</div>` +
+      chairSubs
+        .sort((a, b) => a.poster - b.poster)
+        .map(s => `<div class="chair-row">
+          <span class="chair-row-name">Poster ${s.poster}</span>
+          <span class="chair-row-score">${s.total}/40 — ${posterRating(s.total)}</span>
+        </div>`).join('');
+    chairDiv.appendChild(block);
+  });
+}
+
+/* ══════════════════════════════════════════
+   INFO MODAL
+══════════════════════════════════════════ */
+
+function showInfo(key, type) {
+  const rubric = (type === 'oral' ? ORAL_RUBRIC : POSTER_RUBRIC).find(r => r.key === key);
+  if (!rubric) return;
+
+  document.getElementById('modal-title').textContent = rubric.label;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-grade grade-excellent">
+      <strong>Excellent</strong>${rubric.info.excellent}
+    </div>
+    <div class="modal-grade grade-good">
+      <strong>Good</strong>${rubric.info.good}
+    </div>
+    <div class="modal-grade grade-fair">
+      <strong>Fair</strong>${rubric.info.fair}
+    </div>
+    <div class="modal-grade grade-poor">
+      <strong>Poor</strong>${rubric.info.poor}
+    </div>`;
+
+  document.getElementById('info-modal').style.display = 'flex';
+}
+
+function closeInfoModal() {
+  document.getElementById('info-modal').style.display = 'none';
+}
+
+function closeModal(e) {
+  if (e.target.id === 'info-modal') closeInfoModal();
+}
+
+/* ══════════════════════════════════════════
+   UTILITY
+══════════════════════════════════════════ */
+
+function showAlert(id, msg, type) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<div class="alert alert-${type === 'err' ? 'err' : 'ok'}">${msg}</div>`;
+  setTimeout(() => { el.innerHTML = ''; }, 6000);
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+renderOralChairs();
+renderPosterChairs();
